@@ -12,16 +12,24 @@ EXTRACTION_PROMPT = """\
 
 要求：
 1. 提取每门课程的：课程名称(course)、学分(credits)、成绩(score)
-2. 成绩必须是百分制数字（0-100）。如果原始成绩是等级制（如A/B/C或优/良/中），请根据常见对应关系转换为百分制，并标记 uncertain 为 true
+2. score 字段请保留成绩单上的原始值：
+   - 如果是百分制数字（如 92），直接写数字 "92"
+   - 如果是等级制（如 A+、B-、P、W 等），直接写等级字符串 "A+"
+   - 不要将等级转换为数字，保持原样
 3. 学分必须是数字
 4. 如果某个字段你不确定，将该课程的 uncertain 设为 true
 5. 只返回JSON数组，不要包含任何其他文字或markdown标记
 
-示例输出：
+示例输出（百分制成绩单）：
 [
-  {"course": "高等数学", "credits": 4.0, "score": 92, "uncertain": false},
-  {"course": "大学英语", "credits": 3.0, "score": 85, "uncertain": false},
-  {"course": "体育", "credits": 1.0, "score": 88, "uncertain": true}
+  {"course": "高等数学", "credits": 4.0, "score": "92", "uncertain": false},
+  {"course": "大学英语", "credits": 3.0, "score": "85", "uncertain": false}
+]
+
+示例输出（等级制成绩单）：
+[
+  {"course": "高等数学", "credits": 4.0, "score": "A+", "uncertain": false},
+  {"course": "体育", "credits": 1.0, "score": "P", "uncertain": false}
 ]
 
 请严格按照以上JSON格式输出。"""
@@ -74,7 +82,7 @@ def extract_courses(
         max_retries: 解析失败时的最大重试次数
 
     Returns:
-        [{"course": str, "credits": float, "score": float, "uncertain": bool}, ...]
+        [{"course": str, "credits": float, "score": str, "uncertain": bool}, ...]
 
     Raises:
         RuntimeError: API 调用或 JSON 解析在所有重试后仍失败
@@ -112,7 +120,7 @@ def extract_courses(
             for c in courses:
                 c.setdefault("uncertain", False)
                 c["credits"] = float(c["credits"])
-                c["score"] = float(c["score"])
+                c["score"] = str(c["score"]).strip()
             return courses
         except (json.JSONDecodeError, ValueError, KeyError, TypeError) as e:
             last_error = e
